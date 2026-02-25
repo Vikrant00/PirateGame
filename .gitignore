@@ -1,0 +1,31 @@
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+*.VC.db
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.ipch
+
+# Rider / VSCode
+.idea/
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Build products
+*.exe
+*.dll
+*.pdb
+*.obj
+*.lib
+
+# Optional: if you generate a lot of logs/dumps
+*.log
+*.dmp
