@@ -1,2 +1,55 @@
+# ============================================================
+# Unreal Engine 5 — Git LFS Tracking
+
+# --- Unreal Asset Binaries ---
 *.uasset filter=lfs diff=lfs merge=lfs -text
+*.umap   filter=lfs diff=lfs merge=lfs -text
+# --- 3D / Mesh ---
+*.fbx    filter=lfs diff=lfs merge=lfs -text
+*.obj    filter=lfs diff=lfs merge=lfs -text
+*.abc    filter=lfs diff=lfs merge=lfs -text
+*.usdc   filter=lfs diff=lfs merge=lfs -text
+*.usdz   filter=lfs diff=lfs merge=lfs -text
+# --- Textures ---
+*.png    filter=lfs diff=lfs merge=lfs -text
+*.jpg    filter=lfs diff=lfs merge=lfs -text
+*.jpeg   filter=lfs diff=lfs merge=lfs -text
+*.tga    filter=lfs diff=lfs merge=lfs -text
+*.bmp    filter=lfs diff=lfs merge=lfs -text
+*.exr    filter=lfs diff=lfs merge=lfs -text
+*.hdr    filter=lfs diff=lfs merge=lfs -text
+*.tif    filter=lfs diff=lfs merge=lfs -text
+*.tiff   filter=lfs diff=lfs merge=lfs -text
+*.dds    filter=lfs diff=lfs merge=lfs -text
+*.psd    filter=lfs diff=lfs merge=lfs -text
+# --- Audio ---
+*.wav    filter=lfs diff=lfs merge=lfs -text
+*.mp3    filter=lfs diff=lfs merge=lfs -text
+*.ogg    filter=lfs diff=lfs merge=lfs -text
+*.aif    filter=lfs diff=lfs merge=lfs -text
+*.aiff   filter=lfs diff=lfs merge=lfs -text
+*.flac   filter=lfs diff=lfs merge=lfs -text
+# --- Video ---
+*.mp4    filter=lfs diff=lfs merge=lfs -text
+*.mov    filter=lfs diff=lfs merge=lfs -text
+*.avi    filter=lfs diff=lfs merge=lfs -text
+# --- Fonts ---
+*.ttf    filter=lfs diff=lfs merge=lfs -text
+*.otf    filter=lfs diff=lfs merge=lfs -text
+*.woff   filter=lfs diff=lfs merge=lfs -text
+# --- Compiled / Build Artifacts (tracked if not gitignored) ---
+*.pak    filter=lfs diff=lfs merge=lfs -text
+*.ucas   filter=lfs diff=lfs merge=lfs -text
+*.utoc   filter=lfs diff=lfs merge=lfs -text
+# Line Ending Normalization (text files)
+*.cpp    text eol=lf
+*.h      text eol=lf
+*.cs     text eol=lf
+*.ini    text eol=lf
+*.json   text eol=lf
+*.xml    text eol=lf
+*.txt    text eol=lf
+*.md     text eol=lf
+*.sh     text eol=lf
+*.bat    text eol=crlf
 *.umap filter=lfs diff=lfs merge=lfs -text
