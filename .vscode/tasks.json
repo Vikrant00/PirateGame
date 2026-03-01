@@ -1,0 +1,59 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Git: Save & Push (Add + Commit + Push)",
+            "type": "shell",
+            "command": "git add . && git commit -m \"${input:commitMessage}\" && git push",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Git: Pull Latest",
+            "type": "shell",
+            "command": "git pull",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "label": "Git: Status (What have I changed?)",
+            "type": "shell",
+            "command": "git status && echo '' && echo '--- Files in LFS ---' && git lfs status",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "commitMessage",
+            "type": "promptString",
+            "description": "Describe what you changed (e.g. 'Add ship model', 'Fix player movement')",
+            "default": ""
+        }
+    ]
+}

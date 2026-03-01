@@ -13,7 +13,11 @@ Saved/
 
 # Rider / VSCode
 .idea/
-.vscode/
+# Ignore personal VSCode files, but share tasks.json and extensions.json with the team
+.vscode/settings.json
+.vscode/launch.json
+.vscode/c_cpp_properties.json
+.vscode/*.code-workspace
 
 # OS junk
 .DS_Store
