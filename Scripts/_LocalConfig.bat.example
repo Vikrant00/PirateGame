@@ -1,0 +1,11 @@
+@echo off
+:: ============================================================
+:: LOCAL MACHINE CONFIG — copy this file to _LocalConfig.bat
+:: and set your own engine path. _LocalConfig.bat is gitignored.
+:: ============================================================
+
+:: Path to your Unreal Engine 5.7 install
+set UE_PATH=D:\unreal\UE_5.7
+
+:: (Optional) Override build config: Development, Debug, Shipping
+:: set BUILD_CONFIG=Development

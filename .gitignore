@@ -33,3 +33,9 @@ Thumbs.db
 # Optional: if you generate a lot of logs/dumps
 *.log
 *.dmp
+
+# Scripts — local machine config (each dev sets their own engine path)
+Scripts/_LocalConfig.bat
+
+# Cook / package output
+Build/

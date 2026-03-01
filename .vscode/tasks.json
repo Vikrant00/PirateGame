@@ -1,22 +1,18 @@
 {
     "version": "2.0.0",
     "tasks": [
+
+        // ── GIT ──────────────────────────────────────────────
         {
             "label": "Git: Save & Push (Add + Commit + Push)",
             "type": "shell",
             "command": "git add . && git commit -m \"${input:commitMessage}\" && git push",
             "problemMatcher": [],
             "presentation": {
-                "echo": true,
                 "reveal": "always",
                 "focus": true,
                 "panel": "shared",
-                "showReuseMessage": false,
                 "clear": true
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": false
             }
         },
         {
@@ -25,25 +21,87 @@
             "command": "git pull",
             "problemMatcher": [],
             "presentation": {
-                "echo": true,
                 "reveal": "always",
                 "focus": true,
                 "panel": "shared",
-                "showReuseMessage": false,
                 "clear": true
             }
         },
         {
             "label": "Git: Status (What have I changed?)",
             "type": "shell",
-            "command": "git status && echo '' && echo '--- Files in LFS ---' && git lfs status",
+            "command": "git status && echo '' && echo '--- LFS Status ---' && git lfs status",
             "problemMatcher": [],
             "presentation": {
-                "echo": true,
                 "reveal": "always",
                 "focus": true,
                 "panel": "shared",
-                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+
+        // ── BUILD ─────────────────────────────────────────────
+        {
+            "label": "UE: Build Editor",
+            "type": "shell",
+            "command": ".\\Scripts\\BuildEditor.bat",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "UE: Generate Project Files (.sln)",
+            "type": "shell",
+            "command": ".\\Scripts\\GenerateProject.bat",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "UE: Open Editor",
+            "type": "shell",
+            "command": ".\\Scripts\\OpenEditor.bat",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared",
+                "clear": false
+            }
+        },
+        {
+            "label": "UE: Clean Build (Delete Binaries + Intermediate)",
+            "type": "shell",
+            "command": ".\\Scripts\\CleanBuild.bat",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "UE: Cook Game (Windows Shipping)",
+            "type": "shell",
+            "command": ".\\Scripts\\CookGame.bat",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
                 "clear": true
             }
         }
