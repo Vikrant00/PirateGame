@@ -65,10 +65,12 @@ public class PirateMCP : ModuleRules
 			"Kismet",
 			"Projects",
 			"AssetRegistry",
-			"PythonScriptPlugin",
-			"LevelEditor",
-			"ContentBrowser",
+			"AssetTools",
 		});
+
+		// PythonScriptPlugin: NO compile/link dependency needed.
+		// Python execution uses the `py` console command at runtime (registered by PythonScriptPlugin).
+		// This avoids crashes from module load ordering issues.
 
 		if (Target.bBuildEditor == true)
 		{

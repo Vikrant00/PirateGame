@@ -1,9 +1,16 @@
 #include "PirateMCPPythonCommands.h"
 #include "PirateMCPCommonUtils.h"
 #include "PirateMCPModule.h"
-#include "IPythonScriptPlugin.h"
 #include "Editor.h"
 #include "Misc/StringOutputDevice.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+
+// Python execution uses the `py` console command registered by PythonScriptPlugin.
+// We avoid any compile/link dependency on PythonScriptPlugin — the `py` command
+// is available at runtime as long as the plugin is enabled in the .uproject.
+// Output is captured by wrapping user code in a temp script that redirects stdout.
 
 TSharedPtr<FJsonObject> FPirateMCPPythonCommands::HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
 {
@@ -23,6 +30,78 @@ TSharedPtr<FJsonObject> FPirateMCPPythonCommands::HandleCommand(const FString& C
 	return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown python command: %s"), *CommandType));
 }
 
+static FString RunPythonWithCapture(const FString& Code)
+{
+	// Set up temp directory
+	FString TempDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("PirateMCP"));
+	IFileManager::Get().MakeDirectory(*TempDir, true);
+
+	FString CodeFile = TempDir / TEXT("_pmcp_code.py");
+	FString OutputFile = TempDir / TEXT("_pmcp_output.txt");
+	FString WrapperFile = TempDir / TEXT("_pmcp_wrapper.py");
+
+	// Normalize paths to forward slashes for Python
+	CodeFile.ReplaceInline(TEXT("\\"), TEXT("/"));
+	OutputFile.ReplaceInline(TEXT("\\"), TEXT("/"));
+	WrapperFile.ReplaceInline(TEXT("\\"), TEXT("/"));
+
+	// Write the user's raw code to a file (avoids escaping issues)
+	FFileHelper::SaveStringToFile(Code, *CodeFile, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+
+	// Delete old output file if it exists
+	IFileManager::Get().Delete(*OutputFile, false, false, true);
+
+	// Write wrapper script that executes user code with stdout/stderr capture
+	FString WrapperCode = FString::Printf(TEXT(
+		"import sys, io, traceback\n"
+		"_pmcp_out = io.StringIO()\n"
+		"_pmcp_err = io.StringIO()\n"
+		"_pmcp_old_out, _pmcp_old_err = sys.stdout, sys.stderr\n"
+		"sys.stdout, sys.stderr = _pmcp_out, _pmcp_err\n"
+		"_pmcp_success = True\n"
+		"try:\n"
+		"    with open(r'%s', 'r', encoding='utf-8') as _pmcp_f:\n"
+		"        _pmcp_code = _pmcp_f.read()\n"
+		"    exec(compile(_pmcp_code, '<pirate_mcp>', 'exec'))\n"
+		"except Exception:\n"
+		"    _pmcp_success = False\n"
+		"    traceback.print_exc()\n"
+		"finally:\n"
+		"    sys.stdout, sys.stderr = _pmcp_old_out, _pmcp_old_err\n"
+		"_pmcp_result = _pmcp_out.getvalue() + _pmcp_err.getvalue()\n"
+		"with open(r'%s', 'w', encoding='utf-8') as _pmcp_f:\n"
+		"    _pmcp_f.write(('OK\\n' if _pmcp_success else 'ERROR\\n') + _pmcp_result)\n"
+	), *CodeFile, *OutputFile);
+
+	FFileHelper::SaveStringToFile(WrapperCode, *WrapperFile, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+
+	// Execute via `py` console command
+	if (!GEditor || !GEditor->GetEditorWorldContext().World())
+	{
+		return TEXT("ERROR\nNo editor world available");
+	}
+
+	FStringOutputDevice ConsoleOutput;
+	GEditor->Exec(GEditor->GetEditorWorldContext().World(),
+		*FString::Printf(TEXT("py \"%s\""), *WrapperFile), ConsoleOutput);
+
+	// Read captured output
+	FString Output;
+	if (FFileHelper::LoadFileToString(Output, *OutputFile))
+	{
+		return Output;
+	}
+
+	// If output file wasn't created, the py command itself might have failed
+	FString ConsoleStr = ConsoleOutput;
+	if (!ConsoleStr.IsEmpty())
+	{
+		return FString::Printf(TEXT("ERROR\nPython execution failed. Console output: %s"), *ConsoleStr);
+	}
+
+	return TEXT("ERROR\nPython execution failed — no output captured. Is PythonScriptPlugin enabled?");
+}
+
 TSharedPtr<FJsonObject> FPirateMCPPythonCommands::HandleExecPython(const TSharedPtr<FJsonObject>& Params)
 {
 	FString Code;
@@ -31,74 +110,32 @@ TSharedPtr<FJsonObject> FPirateMCPPythonCommands::HandleExecPython(const TShared
 		return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing required 'code' parameter"));
 	}
 
-	// Determine execution mode
-	FString ModeStr;
-	Params->TryGetStringField(TEXT("execution_mode"), ModeStr);
+	FString RawOutput = RunPythonWithCapture(Code);
 
-	EPythonCommandExecutionMode ExecMode = EPythonCommandExecutionMode::ExecuteFile;
-	if (ModeStr == TEXT("execute_statement"))
-	{
-		ExecMode = EPythonCommandExecutionMode::ExecuteStatement;
-	}
-	else if (ModeStr == TEXT("evaluate_statement"))
-	{
-		ExecMode = EPythonCommandExecutionMode::EvaluateStatement;
-	}
+	// Parse the output — first line is "OK" or "ERROR", rest is actual output
+	bool bSuccess = true;
+	FString Output;
 
-	// Get Python plugin
-	IPythonScriptPlugin* PythonPlugin = IPythonScriptPlugin::Get();
-	if (!PythonPlugin)
+	int32 NewlineIdx;
+	if (RawOutput.FindChar(TEXT('\n'), NewlineIdx))
 	{
-		return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("PythonScriptPlugin is not loaded. Enable it in Project Settings > Plugins."));
+		FString StatusLine = RawOutput.Left(NewlineIdx).TrimEnd();
+		Output = RawOutput.Mid(NewlineIdx + 1);
+		bSuccess = (StatusLine == TEXT("OK"));
+	}
+	else
+	{
+		Output = RawOutput;
+		bSuccess = !RawOutput.StartsWith(TEXT("ERROR"));
 	}
 
-	if (!PythonPlugin->IsPythonAvailable())
-	{
-		// Try to force-enable Python
-		PythonPlugin->ForceEnablePythonAtRuntime();
-		if (!PythonPlugin->IsPythonAvailable())
-		{
-			return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Python is not available. The PythonScriptPlugin may not have initialized correctly."));
-		}
-	}
-
-	// Execute using ExecPythonCommandEx for full output capture
-	FPythonCommandEx PythonCommand;
-	PythonCommand.Command = Code;
-	PythonCommand.ExecutionMode = ExecMode;
-	PythonCommand.FileExecutionScope = EPythonFileExecutionScope::Public;
-	PythonCommand.Flags = EPythonCommandFlags::Unattended;
-
-	bool bSuccess = PythonPlugin->ExecPythonCommandEx(PythonCommand);
-
-	// Build response
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject);
 	Result->SetBoolField(TEXT("success"), bSuccess);
-	Result->SetStringField(TEXT("result"), PythonCommand.CommandResult);
+	Result->SetStringField(TEXT("output"), Output);
 
-	// Capture log output
-	TArray<TSharedPtr<FJsonValue>> LogEntries;
-	for (const FPythonLogOutputEntry& Entry : PythonCommand.LogOutput)
+	if (!bSuccess)
 	{
-		TSharedPtr<FJsonObject> LogEntry = MakeShareable(new FJsonObject);
-		LogEntry->SetStringField(TEXT("type"), LexToString(Entry.Type));
-		LogEntry->SetStringField(TEXT("output"), Entry.Output);
-		LogEntries.Add(MakeShareable(new FJsonValueObject(LogEntry)));
-	}
-	Result->SetArrayField(TEXT("log_output"), LogEntries);
-
-	// Combine all log output into a single string for easy reading
-	FString CombinedOutput;
-	for (const FPythonLogOutputEntry& Entry : PythonCommand.LogOutput)
-	{
-		if (!CombinedOutput.IsEmpty()) CombinedOutput += TEXT("\n");
-		CombinedOutput += Entry.Output;
-	}
-	Result->SetStringField(TEXT("output"), CombinedOutput);
-
-	if (!bSuccess && PythonCommand.CommandResult.Len() > 0)
-	{
-		Result->SetStringField(TEXT("error"), PythonCommand.CommandResult);
+		Result->SetStringField(TEXT("error"), Output);
 	}
 
 	return Result;
@@ -119,7 +156,6 @@ TSharedPtr<FJsonObject> FPirateMCPPythonCommands::HandleExecConsoleCommand(const
 
 	UWorld* World = GEditor->GetEditorWorldContext().World();
 
-	// Execute the console command using FStringOutputDevice to capture output
 	FStringOutputDevice OutputDevice;
 	GEditor->Exec(World, *Command, OutputDevice);
 
@@ -141,57 +177,63 @@ TSharedPtr<FJsonObject> FPirateMCPPythonCommands::HandleGetPythonHelp(const TSha
 		return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing required 'target' parameter (e.g. 'unreal.EditorAssetLibrary')"));
 	}
 
-	// Determine what kind of help
 	FString HelpType;
 	Params->TryGetStringField(TEXT("help_type"), HelpType);
-
-	IPythonScriptPlugin* PythonPlugin = IPythonScriptPlugin::Get();
-	if (!PythonPlugin || !PythonPlugin->IsPythonAvailable())
-	{
-		return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Python is not available"));
-	}
 
 	FString PythonCode;
 	if (HelpType == TEXT("dir"))
 	{
-		// List all members
-		PythonCode = FString::Printf(TEXT("import unreal\nresult = dir(%s)\nfor item in result:\n    if not item.startswith('_'):\n        print(item)"), *Target);
+		PythonCode = FString::Printf(TEXT(
+			"import unreal\n"
+			"result = dir(%s)\n"
+			"for item in result:\n"
+			"    if not item.startswith('_'):\n"
+			"        print(item)"
+		), *Target);
 	}
 	else if (HelpType == TEXT("signature"))
 	{
-		// Get function signature
-		PythonCode = FString::Printf(TEXT("import unreal, inspect\ntry:\n    sig = inspect.signature(%s)\n    print(str(sig))\nexcept:\n    print(type(%s).__name__)"), *Target, *Target);
+		PythonCode = FString::Printf(TEXT(
+			"import unreal, inspect\n"
+			"try:\n"
+			"    sig = inspect.signature(%s)\n"
+			"    print(str(sig))\n"
+			"except:\n"
+			"    print(type(%s).__name__)"
+		), *Target, *Target);
 	}
 	else
 	{
-		// Default: help() — full docstring
 		PythonCode = FString::Printf(TEXT("import unreal\nhelp(%s)"), *Target);
 	}
 
-	FPythonCommandEx PythonCommand;
-	PythonCommand.Command = PythonCode;
-	PythonCommand.ExecutionMode = EPythonCommandExecutionMode::ExecuteFile;
-	PythonCommand.FileExecutionScope = EPythonFileExecutionScope::Public;
-	PythonCommand.Flags = EPythonCommandFlags::Unattended;
+	FString RawOutput = RunPythonWithCapture(PythonCode);
 
-	bool bSuccess = PythonPlugin->ExecPythonCommandEx(PythonCommand);
-
-	FString CombinedOutput;
-	for (const FPythonLogOutputEntry& Entry : PythonCommand.LogOutput)
+	// Parse status
+	bool bSuccess = true;
+	FString Output;
+	int32 NewlineIdx;
+	if (RawOutput.FindChar(TEXT('\n'), NewlineIdx))
 	{
-		if (!CombinedOutput.IsEmpty()) CombinedOutput += TEXT("\n");
-		CombinedOutput += Entry.Output;
+		FString StatusLine = RawOutput.Left(NewlineIdx).TrimEnd();
+		Output = RawOutput.Mid(NewlineIdx + 1);
+		bSuccess = (StatusLine == TEXT("OK"));
+	}
+	else
+	{
+		Output = RawOutput;
+		bSuccess = !RawOutput.StartsWith(TEXT("ERROR"));
 	}
 
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject);
 	Result->SetBoolField(TEXT("success"), bSuccess);
 	Result->SetStringField(TEXT("target"), Target);
 	Result->SetStringField(TEXT("help_type"), HelpType.IsEmpty() ? TEXT("help") : HelpType);
-	Result->SetStringField(TEXT("output"), CombinedOutput);
+	Result->SetStringField(TEXT("output"), Output);
 
 	if (!bSuccess)
 	{
-		Result->SetStringField(TEXT("error"), PythonCommand.CommandResult);
+		Result->SetStringField(TEXT("error"), Output);
 	}
 
 	return Result;

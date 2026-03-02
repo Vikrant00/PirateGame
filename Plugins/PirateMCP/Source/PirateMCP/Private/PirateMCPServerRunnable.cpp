@@ -39,9 +39,10 @@ uint32 FPirateMCPServerRunnable::Run()
 				ClientSocket->SetReceiveBufferSize(65536, ActualRecvSize);
 				// Handle session — returns when client disconnects
 				HandleClientConnection(ClientSocket);
-				// FIX vs original: close the client socket cleanly, then loop back
-				// to listen for the next client instead of killing the thread
-				ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ClientSocket.Get());
+				// Close the client socket cleanly, then loop back to accept next client.
+				// Let TSharedPtr handle deallocation — do NOT call DestroySocket (double-free).
+				ClientSocket->Close();
+				ClientSocket.Reset();
 				UE_LOG(LogPirateMCP, Display, TEXT("Client disconnected — waiting for next connection"));
 			}
 		}
