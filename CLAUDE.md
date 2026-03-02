@@ -108,6 +108,44 @@ git lfs lock Content/Pirate/Maps/OpenWorldTest1.umap
 git lfs unlock Content/Pirate/Maps/OpenWorldTest1.umap
 ```
 
+## PirateMCP Plugin (Custom MCP Server)
+**Status:** COMPLETE — all 10 steps done, plugin builds, bridge registered in Claude Code ✓
+
+**Location:** `Plugins/PirateMCP/`
+**Port:** 55558 (config: `Config/DefaultPirateMCP.ini`)
+**Log category:** `LogPirateMCP`
+
+**Architecture:** UE5 EditorSubsystem → TCP server on 55558 → JSON commands → game thread dispatch
+**Python bridge:** `Scripts/pirate_mcp_bridge.py` (stdio↔TCP for Claude Code MCP integration)
+
+**Implementation Progress:**
+- ✅ Step 1: Plugin scaffold (uplugin, Build.cs, module .h/.cpp)
+- ✅ Step 2: Core infra — PirateMCPBridge (EditorSubsystem, config, dispatch), PirateMCPServerRunnable (TCP listener, reconnect fix, buffer size fix)
+- ✅ Step 3: Port 33 existing commands (Editor, Blueprint, BlueprintGraph + all 18 BlueprintGraph subfiles)
+- ✅ Step 4: Undo/redo — FScopedTransaction on SpawnActor, DeleteActor, SetActorTransform
+- ✅ Step 5: Ocean commands — ocean_set_material_scalar/vector, ocean_spawn_niagara, ocean_set_niagara_float/vector, ocean_list_water_bodies
+- ✅ Step 6: DataTable commands — datatable_list/get_row_names/get_row/get_all_rows/set_row/delete_row
+- ✅ Step 7: World/Level commands — world_get_info/open_level/list_levels/set_editor_camera/list_streaming_levels/load_streaming_level/unload_streaming_level
+- ✅ Step 8: Ship/Actor extensions — actor_get_by_class/set_collision_profile/set_material_scalar_param/add_niagara_component
+- ✅ Step 9: Python MCP bridge — Scripts/pirate_mcp_bridge.py (MCP stdio↔TCP, all 35+ tools, auto-reconnect)
+- ✅ Step 10: Claude Code registration — ~/.claude/settings.json updated, Scripts/pirate_mcp_bridge.bat created
+
+**Command categories being built:**
+- Editor (actor spawn/delete/transform) — porting from UnrealMCP
+- Blueprint (create/compile/modify) — porting from UnrealMCP
+- Ocean (`ocean_*`) — material params, Niagara VFX
+- DataTable (`datatable_*`) — read/write DT rows
+- World (`world_*`) — level open, camera, streaming levels
+- Ship/Actor extensions (`actor_*`) — get by class, collision, material params
+
+**Build command (correct format):**
+```bash
+"D:/unreal/UE_5.7/Engine/Build/BatchFiles/Build.bat" PirateGameEditor Win64 Development -Project="d:/Project/PirateGame/PirateGame.uproject" -WaitMutex
+```
+Note: Config is `Development` not `DevelopmentEditor` — the target name `PirateGameEditor` already implies editor.
+
+**UnrealMCP** (original, Flopperam) stays in `Plugins/UnrealMCP/` on port 55557 — untouched.
+
 ## What NOT to Do
 - Don't use `UPROPERTY()` Blueprint-exposed variables for every field — keep internals C++ private
 - Don't add new input bindings via legacy Input settings in Project Settings

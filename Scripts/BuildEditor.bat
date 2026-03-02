@@ -32,7 +32,7 @@ echo  Engine: %UE_PATH%
 echo ============================================================
 echo.
 
-call "%BUILD_BAT%" PirateGameEditor Win64 %BUILD_CONFIG%Editor -Project="%PROJECT_FILE%" -WaitMutex -FromMsBuild
+call "%BUILD_BAT%" PirateGameEditor Win64 %BUILD_CONFIG% -Project="%PROJECT_FILE%" -WaitMutex -FromMsBuild
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
