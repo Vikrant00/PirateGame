@@ -130,13 +130,18 @@ git lfs unlock Content/Pirate/Maps/OpenWorldTest1.umap
 - ✅ Step 9: Python MCP bridge — Scripts/pirate_mcp_bridge.py (MCP stdio↔TCP, all 35+ tools, auto-reconnect)
 - ✅ Step 10: Claude Code registration — ~/.claude/settings.json updated, Scripts/pirate_mcp_bridge.bat created
 
-**Command categories being built:**
-- Editor (actor spawn/delete/transform) — porting from UnrealMCP
-- Blueprint (create/compile/modify) — porting from UnrealMCP
+**Command categories:**
+- Editor (actor spawn/delete/transform, property access, components)
+- Blueprint (create/compile/modify, variables, graph nodes, functions)
 - Ocean (`ocean_*`) — material params, Niagara VFX
 - DataTable (`datatable_*`) — read/write DT rows
 - World (`world_*`) — level open, camera, streaming levels
-- Ship/Actor extensions (`actor_*`) — get by class, collision, material params
+- Actor extensions (`actor_*`) — get by class, collision, material params, properties, components
+- **Python (`exec_python`)** — execute arbitrary Python in UE5's `unreal` module (GOD COMMAND — access to ALL UE5 APIs)
+- **Console (`exec_console_command`)** — run UE console commands
+- **API discovery (`get_python_help`)** — introspect any UE5 Python class/method via dir()/help()
+- **Editor Utility (`editor_*`)** — undo, redo, save_all, play, stop, get_selected, select_actors, take_screenshot
+- **Asset Management (`asset_*`)** — list, get_info, duplicate, rename, delete, import, save, find_references
 
 **Build command (correct format):**
 ```bash

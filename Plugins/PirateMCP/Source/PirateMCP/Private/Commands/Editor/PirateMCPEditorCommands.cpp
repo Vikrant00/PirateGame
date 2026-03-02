@@ -9,6 +9,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Misc/FileHelper.h"
 #include "GameFramework/Actor.h"
+#include "EngineUtils.h"
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
@@ -80,7 +81,24 @@ TSharedPtr<FJsonObject> FPirateMCPEditorCommands::HandleCommand(const FString& C
     {
         return HandleActorAddNiagaraComponent(Params);
     }
-    
+    // Property access
+    else if (CommandType == TEXT("actor_get_properties"))
+    {
+        return HandleActorGetProperties(Params);
+    }
+    else if (CommandType == TEXT("actor_set_property"))
+    {
+        return HandleActorSetProperty(Params);
+    }
+    else if (CommandType == TEXT("actor_get_components"))
+    {
+        return HandleActorGetComponents(Params);
+    }
+    else if (CommandType == TEXT("actor_add_component"))
+    {
+        return HandleActorAddComponent(Params);
+    }
+
     return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
 
@@ -475,6 +493,222 @@ TSharedPtr<FJsonObject> FPirateMCPEditorCommands::HandleActorAddNiagaraComponent
         Result->SetStringField(TEXT("actor"), ActorName);
         Result->SetStringField(TEXT("asset_path"), AssetPath);
         return Result;
+    }
+    return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+}
+
+// ── Property Access ───────────────────────────────────────────────────────────
+
+TSharedPtr<FJsonObject> FPirateMCPEditorCommands::HandleActorGetProperties(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    {
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing required 'name' parameter"));
+    }
+
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+    if (!World) return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("No world"));
+
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        if (It->GetName() == ActorName || It->GetActorLabel() == ActorName)
+        {
+            AActor* Actor = *It;
+            TSharedPtr<FJsonObject> PropsObj = MakeShareable(new FJsonObject);
+
+            for (TFieldIterator<FProperty> PropIt(Actor->GetClass()); PropIt; ++PropIt)
+            {
+                FProperty* Prop = *PropIt;
+                if (!Prop->HasAnyPropertyFlags(CPF_Edit | CPF_BlueprintVisible))
+                {
+                    continue;
+                }
+
+                FString ValueStr;
+                const void* ValuePtr = Prop->ContainerPtrToValuePtr<void>(Actor);
+                Prop->ExportTextItem_Direct(ValueStr, ValuePtr, nullptr, Actor, PPF_None);
+
+                TSharedPtr<FJsonObject> PropInfo = MakeShareable(new FJsonObject);
+                PropInfo->SetStringField(TEXT("type"), Prop->GetCPPType());
+                PropInfo->SetStringField(TEXT("value"), ValueStr);
+                PropInfo->SetStringField(TEXT("category"), Prop->GetMetaData(TEXT("Category")));
+                PropsObj->SetObjectField(Prop->GetName(), PropInfo);
+            }
+
+            TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject);
+            Result->SetBoolField(TEXT("success"), true);
+            Result->SetStringField(TEXT("actor"), ActorName);
+            Result->SetStringField(TEXT("class"), Actor->GetClass()->GetName());
+            Result->SetObjectField(TEXT("properties"), PropsObj);
+            return Result;
+        }
+    }
+    return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+}
+
+TSharedPtr<FJsonObject> FPirateMCPEditorCommands::HandleActorSetProperty(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName, PropName, ValueStr;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name'"));
+    if (!Params->TryGetStringField(TEXT("property_name"), PropName))
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name'"));
+    if (!Params->TryGetStringField(TEXT("value"), ValueStr))
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'value'"));
+
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+    if (!World) return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("No world"));
+
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        if (It->GetName() == ActorName || It->GetActorLabel() == ActorName)
+        {
+            AActor* Actor = *It;
+            FProperty* Prop = Actor->GetClass()->FindPropertyByName(FName(*PropName));
+            if (!Prop)
+            {
+                return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property '%s' not found on %s"), *PropName, *ActorName));
+            }
+
+            FScopedTransaction Transaction(NSLOCTEXT("PirateMCP", "SetProperty", "PirateMCP: Set Property"));
+            Actor->Modify();
+
+            void* ValuePtr = Prop->ContainerPtrToValuePtr<void>(Actor);
+            const TCHAR* ImportResult = Prop->ImportText_Direct(*ValueStr, ValuePtr, Actor, PPF_None);
+
+            if (!ImportResult)
+            {
+                return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to set property '%s' to '%s'"), *PropName, *ValueStr));
+            }
+
+            Actor->PostEditChange();
+
+            TSharedPtr<FJsonObject> ResultObj = MakeShareable(new FJsonObject);
+            ResultObj->SetBoolField(TEXT("success"), true);
+            ResultObj->SetStringField(TEXT("actor"), ActorName);
+            ResultObj->SetStringField(TEXT("property"), PropName);
+            ResultObj->SetStringField(TEXT("value"), ValueStr);
+            return ResultObj;
+        }
+    }
+    return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+}
+
+TSharedPtr<FJsonObject> FPirateMCPEditorCommands::HandleActorGetComponents(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    {
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing required 'name' parameter"));
+    }
+
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+    if (!World) return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("No world"));
+
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        if (It->GetName() == ActorName || It->GetActorLabel() == ActorName)
+        {
+            AActor* Actor = *It;
+            TArray<TSharedPtr<FJsonValue>> CompArray;
+
+            TArray<UActorComponent*> Components;
+            Actor->GetComponents(Components);
+
+            for (UActorComponent* Comp : Components)
+            {
+                TSharedPtr<FJsonObject> CompObj = MakeShareable(new FJsonObject);
+                CompObj->SetStringField(TEXT("name"), Comp->GetName());
+                CompObj->SetStringField(TEXT("class"), Comp->GetClass()->GetName());
+
+                USceneComponent* SceneComp = Cast<USceneComponent>(Comp);
+                if (SceneComp)
+                {
+                    FVector RelLoc = SceneComp->GetRelativeLocation();
+                    TArray<TSharedPtr<FJsonValue>> LocArr;
+                    LocArr.Add(MakeShareable(new FJsonValueNumber(RelLoc.X)));
+                    LocArr.Add(MakeShareable(new FJsonValueNumber(RelLoc.Y)));
+                    LocArr.Add(MakeShareable(new FJsonValueNumber(RelLoc.Z)));
+                    CompObj->SetArrayField(TEXT("relative_location"), LocArr);
+
+                    if (SceneComp->GetAttachParent())
+                    {
+                        CompObj->SetStringField(TEXT("attached_to"), SceneComp->GetAttachParent()->GetName());
+                    }
+                }
+
+                CompArray.Add(MakeShareable(new FJsonValueObject(CompObj)));
+            }
+
+            TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject);
+            Result->SetBoolField(TEXT("success"), true);
+            Result->SetStringField(TEXT("actor"), ActorName);
+            Result->SetNumberField(TEXT("count"), CompArray.Num());
+            Result->SetArrayField(TEXT("components"), CompArray);
+            return Result;
+        }
+    }
+    return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+}
+
+TSharedPtr<FJsonObject> FPirateMCPEditorCommands::HandleActorAddComponent(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName, ClassName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name'"));
+    if (!Params->TryGetStringField(TEXT("component_class"), ClassName))
+        return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'component_class' (e.g. StaticMeshComponent, PointLightComponent)"));
+
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+    if (!World) return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("No world"));
+
+    // Find the component class
+    UClass* CompClass = nullptr;
+    for (TObjectIterator<UClass> ClassIt; ClassIt; ++ClassIt)
+    {
+        if (ClassIt->GetName() == ClassName && ClassIt->IsChildOf(UActorComponent::StaticClass()))
+        {
+            CompClass = *ClassIt;
+            break;
+        }
+    }
+
+    if (!CompClass)
+    {
+        return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Component class not found: %s"), *ClassName));
+    }
+
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        if (It->GetName() == ActorName || It->GetActorLabel() == ActorName)
+        {
+            AActor* Actor = *It;
+
+            FScopedTransaction Transaction(NSLOCTEXT("PirateMCP", "AddComponent", "PirateMCP: Add Component"));
+            Actor->Modify();
+
+            UActorComponent* NewComp = NewObject<UActorComponent>(Actor, CompClass);
+            if (!NewComp)
+            {
+                return FPirateMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create component"));
+            }
+
+            NewComp->RegisterComponent();
+
+            USceneComponent* SceneComp = Cast<USceneComponent>(NewComp);
+            if (SceneComp && Actor->GetRootComponent())
+            {
+                SceneComp->AttachToComponent(Actor->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+            }
+
+            TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject);
+            Result->SetBoolField(TEXT("success"), true);
+            Result->SetStringField(TEXT("actor"), ActorName);
+            Result->SetStringField(TEXT("component_name"), NewComp->GetName());
+            Result->SetStringField(TEXT("component_class"), CompClass->GetName());
+            return Result;
+        }
     }
     return FPirateMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
 }

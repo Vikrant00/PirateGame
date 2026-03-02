@@ -45,6 +45,9 @@ void UPirateMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
 	OceanCommands        = MakeShared<FPirateMCPOceanCommands>();
 	DataTableCommands    = MakeShared<FPirateMCPDataTableCommands>();
 	WorldCommands        = MakeShared<FPirateMCPWorldCommands>();
+	PythonCommands       = MakeShared<FPirateMCPPythonCommands>();
+	EditorUtilityCommands = MakeShared<FPirateMCPEditorUtilityCommands>();
+	AssetCommands        = MakeShared<FPirateMCPAssetCommands>();
 
 	LoadConfig();
 	StartServer();
@@ -156,7 +159,8 @@ FString UPirateMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
 				TArray<TSharedPtr<FJsonValue>> Categories;
 				for (const FString& Cat : TArray<FString>{
 					TEXT("editor"), TEXT("blueprint"), TEXT("blueprint_graph"),
-					TEXT("ocean"), TEXT("datatable"), TEXT("world") })
+					TEXT("ocean"), TEXT("datatable"), TEXT("world"),
+					TEXT("python"), TEXT("editor_utility"), TEXT("asset") })
 				{
 					Categories.Add(MakeShareable(new FJsonValueString(Cat)));
 				}
@@ -222,6 +226,23 @@ FString UPirateMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
 			else if (CommandType.StartsWith(TEXT("world_")))
 			{
 				ResultJson = WorldCommands->HandleCommand(CommandType, Params);
+			}
+			// ── Python / Console ────────────────────────────────────
+			else if (CommandType == TEXT("exec_python") ||
+			         CommandType == TEXT("exec_console_command") ||
+			         CommandType == TEXT("get_python_help"))
+			{
+				ResultJson = PythonCommands->HandleCommand(CommandType, Params);
+			}
+			// ── Editor Utility ──────────────────────────────────────
+			else if (CommandType.StartsWith(TEXT("editor_")))
+			{
+				ResultJson = EditorUtilityCommands->HandleCommand(CommandType, Params);
+			}
+			// ── Asset Management ────────────────────────────────────
+			else if (CommandType.StartsWith(TEXT("asset_")))
+			{
+				ResultJson = AssetCommands->HandleCommand(CommandType, Params);
 			}
 			else
 			{

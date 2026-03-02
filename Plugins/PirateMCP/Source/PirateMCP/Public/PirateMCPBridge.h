@@ -10,6 +10,9 @@
 #include "Commands/Ocean/PirateMCPOceanCommands.h"
 #include "Commands/DataTable/PirateMCPDataTableCommands.h"
 #include "Commands/World/PirateMCPWorldCommands.h"
+#include "Commands/Python/PirateMCPPythonCommands.h"
+#include "Commands/EditorUtility/PirateMCPEditorUtilityCommands.h"
+#include "Commands/Asset/PirateMCPAssetCommands.h"
 #include "PirateMCPBridge.generated.h"
 
 class FPirateMCPServerRunnable;
@@ -43,6 +46,9 @@ private:
 	TSharedPtr<FPirateMCPOceanCommands> OceanCommands;
 	TSharedPtr<FPirateMCPDataTableCommands> DataTableCommands;
 	TSharedPtr<FPirateMCPWorldCommands> WorldCommands;
+	TSharedPtr<FPirateMCPPythonCommands> PythonCommands;
+	TSharedPtr<FPirateMCPEditorUtilityCommands> EditorUtilityCommands;
+	TSharedPtr<FPirateMCPAssetCommands> AssetCommands;
 
 	void LoadConfig();
 };

@@ -18,4 +18,8 @@ private:
 	TSharedPtr<FJsonObject> HandleActorSetCollisionProfile(const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> HandleActorSetMaterialScalarParam(const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> HandleActorAddNiagaraComponent(const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> HandleActorGetProperties(const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> HandleActorSetProperty(const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> HandleActorGetComponents(const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> HandleActorAddComponent(const TSharedPtr<FJsonObject>& Params);
 };

@@ -17,6 +17,9 @@ public class PirateMCP : ModuleRules
 			System.IO.Path.Combine(ModuleDirectory, "Public/Commands/Ocean"),
 			System.IO.Path.Combine(ModuleDirectory, "Public/Commands/DataTable"),
 			System.IO.Path.Combine(ModuleDirectory, "Public/Commands/World"),
+			System.IO.Path.Combine(ModuleDirectory, "Public/Commands/Python"),
+			System.IO.Path.Combine(ModuleDirectory, "Public/Commands/EditorUtility"),
+			System.IO.Path.Combine(ModuleDirectory, "Public/Commands/Asset"),
 		});
 
 		PrivateIncludePaths.AddRange(new string[] {
@@ -30,6 +33,9 @@ public class PirateMCP : ModuleRules
 			System.IO.Path.Combine(ModuleDirectory, "Private/Commands/Ocean"),
 			System.IO.Path.Combine(ModuleDirectory, "Private/Commands/DataTable"),
 			System.IO.Path.Combine(ModuleDirectory, "Private/Commands/World"),
+			System.IO.Path.Combine(ModuleDirectory, "Private/Commands/Python"),
+			System.IO.Path.Combine(ModuleDirectory, "Private/Commands/EditorUtility"),
+			System.IO.Path.Combine(ModuleDirectory, "Private/Commands/Asset"),
 		});
 
 		PublicDependencyModuleNames.AddRange(new string[] {
@@ -59,6 +65,9 @@ public class PirateMCP : ModuleRules
 			"Kismet",
 			"Projects",
 			"AssetRegistry",
+			"PythonScriptPlugin",
+			"LevelEditor",
+			"ContentBrowser",
 		});
 
 		if (Target.bBuildEditor == true)
